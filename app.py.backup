@@ -1,0 +1,289 @@
+from flask import Flask, render_template, request, jsonify, redirect, flash
+import subprocess
+import json
+import pandas as pd
+from datetime import datetime
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'  # Needed for flash messages
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html')
+
+@app.route('/add_hospital')
+def add_hospital():
+    return render_template('add_hospital.html')
+
+@app.route('/analytics')
+def analytics():
+    return render_template('analytics.html')
+
+# Get ALL hospital data for dashboard
+@app.route('/api/all_hospitals')
+def all_hospitals():
+    """Get all hospital data for dashboard display"""
+    try:
+        cmd = '''hive -S -e "USE hospital_db; SELECT hospital_name, total_beds, occupied_beds, icu_beds, city, date FROM hospital_beds ORDER BY date DESC, hospital_name;"'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        output = result.stdout
+        
+        print("Hive Output:", output)  # Debug print
+        
+        hospitals = []
+        for line in output.split("\n"):
+            if line.strip() and not line.startswith('SLF4J'):
+                parts = line.split("\t")
+                print("Parts:", parts)  # Debug print
+                if len(parts) >= 6:
+                    try:
+                        total_beds = int(parts[1])
+                        occupied_beds = int(parts[2])
+                        available_beds = total_beds - occupied_beds
+                        occupancy_rate = round((occupied_beds * 100.0) / total_beds, 2) if total_beds > 0 else 0
+                        
+                        hospitals.append({
+                            "name": parts[0],
+                            "total_beds": total_beds,
+                            "occupied_beds": occupied_beds,
+                            "icu_beds": int(parts[3]),
+                            "city": parts[4],
+                            "date": parts[5],
+                            "available_beds": available_beds,
+                            "occupancy_rate": occupancy_rate,
+                            "status": get_occupancy_status(occupancy_rate)
+                        })
+                    except ValueError as e:
+                        print(f"ValueError: {e} for parts: {parts}")
+                        continue
+        
+        print(f"Returning {len(hospitals)} hospitals")  # Debug print
+        return jsonify(hospitals)
+    except Exception as e:
+        print(f"Error in all_hospitals: {e}")  # Debug print
+        return jsonify({"error": str(e)})
+
+@app.route('/api/statistics')
+def statistics():
+    """Get overall statistics"""
+    try:
+        cmd = '''hive -S -e "USE hospital_db; 
+                SELECT COUNT(*) as total_hospitals,
+                SUM(total_beds) as total_beds,
+                SUM(occupied_beds) as occupied_beds,
+                SUM(icu_beds) as icu_beds,
+                COUNT(DISTINCT city) as cities_covered
+                FROM hospital_beds;"'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        output = result.stdout
+        
+        print("Statistics Hive Output:", output)  # Debug print
+        
+        for line in output.split("\n"):
+            if line.strip() and not line.startswith('SLF4J'):
+                parts = line.split("\t")
+                print("Statistics Parts:", parts)  # Debug print
+                if len(parts) >= 5:
+                    try:
+                        total_beds = int(float(parts[1]))
+                        occupied_beds = int(float(parts[2]))
+                        available_beds = total_beds - occupied_beds
+                        occupancy_rate = round((occupied_beds * 100.0) / total_beds, 2) if total_beds > 0 else 0
+                        
+                        stats = {
+                            "total_hospitals": int(parts[0]),
+                            "total_beds": total_beds,
+                            "occupied_beds": occupied_beds,
+                            "icu_beds": int(float(parts[3])),
+                            "cities_covered": int(parts[4]),
+                            "available_beds": available_beds,
+                            "overall_occupancy_rate": occupancy_rate
+                        }
+                        print("Statistics:", stats)  # Debug print
+                        return jsonify(stats)
+                    except ValueError as e:
+                        print(f"Statistics ValueError: {e}")
+                        continue
+        
+        return jsonify({"error": "No data found"})
+    except Exception as e:
+        print(f"Error in statistics: {e}")
+        return jsonify({"error": str(e)})
+
+@app.route('/api/timeseries_data')
+def timeseries_data():
+    """Get time series data for charts"""
+    try:
+        cmd = '''hive -S -e "USE hospital_db; 
+                SELECT date, 
+                SUM(total_beds) as total_beds,
+                SUM(occupied_beds) as occupied_beds,
+                SUM(icu_beds) as icu_beds
+                FROM hospital_beds 
+                GROUP BY date 
+                ORDER BY date;"'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        output = result.stdout
+        
+        dates = []
+        total_beds = []
+        occupied_beds = []
+        icu_beds = []
+        available_beds = []
+        
+        for line in output.split("\n"):
+            if line.strip() and not line.startswith('SLF4J'):
+                parts = line.split("\t")
+                if len(parts) >= 4:
+                    try:
+                        dates.append(parts[0])
+                        total = int(float(parts[1]))
+                        occupied = int(float(parts[2]))
+                        icu = int(float(parts[3]))
+                        
+                        total_beds.append(total)
+                        occupied_beds.append(occupied)
+                        icu_beds.append(icu)
+                        available_beds.append(total - occupied)
+                    except ValueError:
+                        continue
+        
+        return jsonify({
+            "dates": dates,
+            "total_beds": total_beds,
+            "occupied_beds": occupied_beds,
+            "icu_beds": icu_beds,
+            "available_beds": available_beds
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/api/city_data')
+def city_data():
+    """Get city-wise data for charts"""
+    try:
+        cmd = '''hive -S -e "USE hospital_db; SELECT city, 
+                SUM(total_beds) as total_beds,
+                SUM(occupied_beds) as occupied_beds,
+                SUM(icu_beds) as icu_beds,
+                COUNT(*) as hospital_count
+                FROM hospital_beds 
+                GROUP BY city 
+                ORDER BY total_beds DESC;"'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        output = result.stdout
+        
+        cities = []
+        total_beds = []
+        occupied_beds = []
+        icu_beds = []
+        hospital_counts = []
+        occupancy_rates = []
+        
+        for line in output.split("\n"):
+            if line.strip() and not line.startswith('SLF4J'):
+                parts = line.split("\t")
+                if len(parts) >= 5:
+                    try:
+                        city = parts[0]
+                        total = int(float(parts[1]))
+                        occupied = int(float(parts[2]))
+                        icu = int(float(parts[3]))
+                        count = int(parts[4])
+                        
+                        cities.append(city)
+                        total_beds.append(total)
+                        occupied_beds.append(occupied)
+                        icu_beds.append(icu)
+                        hospital_counts.append(count)
+                        occupancy_rate = round((occupied * 100.0) / total, 2) if total > 0 else 0
+                        occupancy_rates.append(occupancy_rate)
+                    except ValueError:
+                        continue
+        
+        return jsonify({
+            "cities": cities,
+            "total_beds": total_beds,
+            "occupied_beds": occupied_beds,
+            "icu_beds": icu_beds,
+            "hospital_counts": hospital_counts,
+            "occupancy_rates": occupancy_rates
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+def get_occupancy_status(rate):
+    """Helper function to determine occupancy status"""
+    if rate >= 80: return {"text": "High", "color": "danger"}
+    if rate >= 60: return {"text": "Medium", "color": "warning"}
+    return {"text": "Low", "color": "success"}
+
+@app.route("/add_hospital", methods=["GET", "POST"])
+def add_hospital_post():
+    if request.method == "POST":
+        hospital_name = request.form["hospital_name"]
+        total_beds = int(request.form["total_beds"])
+        occupied_beds = int(request.form["occupied_beds"])
+        icu_beds = int(request.form["icu_beds"])
+        city = request.form.get("city", "Unknown")
+        
+        # Validate data
+        if occupied_beds > total_beds:
+            flash("Error: Occupied beds cannot exceed total beds")
+            return render_template("add_hospital.html")
+        
+        # Get current date
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # Hive insert command - FIXED syntax
+        hive_insert_cmd = f'''hive -e "USE hospital_db; INSERT INTO TABLE hospital_beds VALUES ('{hospital_name}', {total_beds}, {occupied_beds}, {icu_beds}, '{city}', '{current_date}');"'''
+        
+        print("Hive Insert Command:", hive_insert_cmd)  # Debug print
+        
+        try:
+            result = subprocess.run(hive_insert_cmd, shell=True, capture_output=True, text=True)
+            print("Hive Insert Result:", result.returncode)  # Debug print
+            print("Hive Insert stdout:", result.stdout)  # Debug print
+            print("Hive Insert stderr:", result.stderr)  # Debug print
+            
+            if result.returncode == 0:
+                flash(f"Hospital '{hospital_name}' added successfully!")
+                return redirect("/dashboard")
+            else:
+                flash(f"Error inserting data: {result.stderr}")
+                return render_template("add_hospital.html")
+        except Exception as e:
+            flash(f"Error: {str(e)}")
+            return render_template("add_hospital.html")
+    
+    return render_template("add_hospital.html")
+
+@app.route('/api/test_connection')
+def test_connection():
+    """Test Hive connection"""
+    try:
+        cmd = 'hive -S -e "USE hospital_db; SELECT COUNT(*) FROM hospital_beds;"'
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        return jsonify({
+            "status": "success",
+            "count": result.stdout.strip(),
+            "error": result.stderr
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+if __name__ == '__main__':
+    print("🚀 Starting Hospital Bed Analysis System...")
+    print("📊 Access the dashboard at: http://localhost:5000/dashboard")
+    print("🏥 Add hospitals at: http://localhost:5000/add_hospital")
+    print("🔗 Test API at: http://localhost:5000/api/test_connection")
+    app.run(debug=True, host='0.0.0.0', port=5000)

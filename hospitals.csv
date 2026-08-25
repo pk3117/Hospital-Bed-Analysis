@@ -1,0 +1,29 @@
+hospital_name,total_beds,occupied_beds,icu_beds,city,date
+Lilavati Hospital,323,290,42,Mumbai,2025-10-07
+Tata Memorial Hospital,600,580,80,Mumbai,2025-10-07
+Jaslok Hospital,350,315,50,Mumbai,2025-10-07
+Apollo Speciality Hospital,300,60,40,Chennai,2025-10-07
+MIOT International Hospital,350,300,45,Chennai,2025-10-07
+Fortis Malar Hospital,180,150,25,Chennai,2025-10-07
+Global Health City,400,350,55,Chennai,2025-10-07
+Manipal Hospital,600,540,75,Bangalore,2025-10-07
+Narayana Health,500,450,65,Bangalore,2025-10-07
+Fortis Hospital Bangalore,400,360,50,Bangalore,2025-10-07
+Apollo Hospital Bangalore,250,220,35,Bangalore,2025-10-07
+Yashoda Hospitals,700,130,90,Hyderabad,2025-10-07
+Continental Hospitals,350,310,45,Hyderabad,2025-10-07
+KIMS Hospitals,400,360,55,Hyderabad,2025-10-07
+Apollo Hospitals Hyderabad,300,270,40,Hyderabad,2025-10-07
+Apollo Gleneagles Hospital,350,315,48,Kolkata,2025-10-07
+AMRI Hospitals,400,360,52,Kolkata,2025-10-07
+Fortis Hospital Kolkata,300,270,30,Kolkata,2025-10-07
+Ruby General Hospital,200,180,20,Kolkata,2025-10-07
+Ruby Hall Clinic,550,495,55,Pune,2025-10-07
+Jehangir Hospital,350,315,35,Pune,2025-10-07
+Sahyadri Hospital,400,360,40,Pune,2025-10-07
+Noble Hospital,250,225,25,Pune,2025-10-07
+Apollo Hospital Ahmedabad,300,270,30,Ahmedabad,2025-10-07
+CIMS Hospital,350,315,35,Ahmedabad,2025-10-07
+Sterling Hospitals,250,225,25,Ahmedabad,2025-10-07
+PGIMER Chandigarh,1800,1020,780,Chandigarh,2025-10-07
+Fortis Hospital Mohali,300,20,280,Chandigarh,2025-10-07

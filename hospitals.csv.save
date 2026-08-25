@@ -1,0 +1,23 @@
+hospital_name,total_beds,occupied_beds,icu_beds,city,date
+SRM Prime Hospital,300,250,20,Chennai,2024-01-01
+MIOT International,400,320,30,Chennai,2024-01-01
+NRG Speciality,500,380,30,Hyderabad,2024-01-01
+Apollo Hospitals,350,280,25,Bangalore,2024-01-02
+Fortis Hospital,450,360,35,Mumbai,2024-01-02
+hdfs dfs -mkdir -p /user/hive/data
+hdfs dfs -put hospitals.csv /user/hive/data/
+
+
+
+^X
+
+
+
+
+
+
+
+
+
+
+
